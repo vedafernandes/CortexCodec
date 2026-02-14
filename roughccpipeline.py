@@ -46,7 +46,7 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from google.colab import drive
 drive.mount("/content/drive")
 
-filepath = "/content/drive/MyDrive/Files_CortexCodec/Copy of BrainFlow-RAW_sad_stimuli_2_7_0.csv"
+filepath = "OpenBCI_data/2-7/OpenBCISession_happy_stimuli2_2_7/OpenBCI-RAW-2026-02-07_15-05-02.txt"
 
 df = pd.read_csv(
     filepath,
