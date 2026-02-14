@@ -7,16 +7,6 @@ Original file is located at
     https://colab.research.google.com/drive/1uYcN5Jlj5bFPW1ueKu-_-IAiXImq3Sj4
 """
 
-pip install matplotlib
-!pip -q install scipy
-!pip -q install mne
-!pip -q install numpy
-!pip -q install pandas
-!pip -q install scikit-learn
-!pip -q install seaborn
-!pip -q install joblib
-!pip -q install brainflow
-
 import numpy as np
 import pandas as pd
 import mne
