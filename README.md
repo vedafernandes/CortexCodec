@@ -1,5 +1,5 @@
 # Setup
-Create a virtual environment. Navigate to the backend directory, and run the following command.
+Create a virtual environment. Navigate to the directory, and run the following command.
 
 ```
 python3 -m venv ./venv
