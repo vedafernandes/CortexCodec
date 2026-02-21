@@ -8,8 +8,8 @@ python3 -m venv ./venv
 Activating the venv. Run one of the following:
 
 ```
-venv/Scripts/activate/ # macOS / Linux
-source venv/bin/activate # Windows
+source venv/bin/activate # macOS / Linux
+venv/Scripts/activate/# Windows
 ```
 
 Install dependencies from requirements.txt
