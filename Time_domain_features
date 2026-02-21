@@ -1,0 +1,129 @@
+import os
+import numpy as np
+from scipy.io import loadmat, savemat
+from scipy.signal import butter, filtfilt
+from scipy.stats import kurtosis, skew
+
+# =========================================================
+# 1. Time-domain feature extraction
+# =========================================================
+def extract_time_domain_features(signal):
+    """
+    Extract 6 time-domain features for each channel:
+    mean, std, max, min, kurtosis, skewness
+
+    Parameters
+    ----------
+    signal : ndarray (channels x samples)
+
+    Returns
+    -------
+    features : ndarray (channels x 6)
+    """
+    num_channels, num_samples = signal.shape
+
+    features = np.zeros((num_channels, 6))
+
+    for ch in range(num_channels):
+        data = signal[ch, :]
+
+        features[ch, 0] = np.mean(data)          # mean
+        features[ch, 1] = np.std(data)           # std
+        features[ch, 2] = np.max(data)           # max
+        features[ch, 3] = np.min(data)           # min
+        features[ch, 4] = kurtosis(data)         # kurtosis
+        features[ch, 5] = skew(data)             # skewness
+
+    return features
+
+
+# =========================================================
+# 2. EEG filtering (replacement of Proprocess_filter)
+# =========================================================
+def bandpass_filter(signal, fs, lowcut, highcut, order=4):
+    """
+    Bandpass Butterworth filter
+
+    signal: channels x samples
+    """
+    nyquist = 0.5 * fs
+    low = lowcut / nyquist
+    high = highcut / nyquist
+
+    b, a = butter(order, [low, high], btype='bandpass')
+
+    filtered = filtfilt(b, a, signal, axis=1)
+    return filtered
+
+
+def Proprocess_filter(EEG_signal, fs_down, filter_low_para, filter_high_para):
+    """
+    Mimic MATLAB Proprocess_filter behavior
+    """
+    # combine to bandpass range
+    low = max(filter_low_para[0], filter_high_para[0])
+    high = min(filter_low_para[1], filter_high_para[1])
+
+    EEG_signal_filtered = bandpass_filter(EEG_signal, fs_down, low, high)
+    return EEG_signal_filtered
+
+
+# =========================================================
+# 3. Example: load one file
+# =========================================================
+file_path = '/Users/mac/Desktop/先进院科研学习材料/SEED_IV/eeg_raw_data/1/1_20160518.mat'
+data = loadmat(file_path)
+
+EEG_signal_1 = data['cz_eeg1']
+
+features = extract_time_domain_features(EEG_signal_1)
+
+print("Time-domain features (rows = channels, columns = mean, std, max, min, kurtosis, skewness)")
+print(features)
+
+
+# =========================================================
+# 4. Batch processing all .mat files
+# =========================================================
+folder_path = '/Users/mac/Desktop/先进院科研学习材料/SEED_IV/eeg_raw_data/1'
+output_folder = '/Users/mac/Desktop/advanced_institute/EEG_filtered_features'
+
+os.makedirs(output_folder, exist_ok=True)
+
+mat_files = [f for f in os.listdir(folder_path) if f.endswith('.mat')]
+
+for i, filename in enumerate(mat_files, start=1):
+
+    file_path = os.path.join(folder_path, filename)
+    data = loadmat(file_path)
+
+    # get all variables (channels)
+    field_names = [key for key in data.keys() if not key.startswith('__')]
+
+    for j, field in enumerate(field_names, start=1):
+
+        EEG_signal = data[field]
+
+        # Filtering
+        fs_down = 500
+        filter_low_para = [0.5, 30]
+        filter_high_para = [1, 35]
+
+        EEG_signal_filtered = Proprocess_filter(
+            EEG_signal,
+            fs_down,
+            filter_low_para,
+            filter_high_para
+        )
+
+        # Feature extraction
+        features = extract_time_domain_features(EEG_signal_filtered)
+
+        # Output filename
+        output_filename = f'features_file{i}_channel{j}.mat'
+        output_filepath = os.path.join(output_folder, output_filename)
+
+        # Save only features
+        savemat(output_filepath, {'features': features})
+
+    print(f"Finished processing file {i}/{len(mat_files)} : {filename}")
