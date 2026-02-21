@@ -22,7 +22,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import (
     train_test_split,
     StratifiedKFold,
-    GridSearchCV
+    GridSearchCV 
 )
 from sklearn.metrics import (
     classification_report,
@@ -33,8 +33,6 @@ from scipy.signal import iirnotch
 from sklearn.decomposition import FastICA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
-from google.colab import drive
-drive.mount("/content/drive")
 
 filepath = "/content/drive/MyDrive/Files_CortexCodec/Copy of BrainFlow-RAW_sad_stimuli_2_7_0.csv"
 
