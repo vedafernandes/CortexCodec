@@ -34,25 +34,24 @@ from sklearn.decomposition import FastICA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 
-filepath = "/content/drive/MyDrive/Files_CortexCodec/Copy of BrainFlow-RAW_sad_stimuli_2_7_0.csv"
 
-df = pd.read_csv(
+def load_data(filepath):
+    df = pd.read_csv(
     filepath,
     comment='%',
     sep=None,
     engine='python'
 )
-print(df.head())
+    print(df.head())
 
-eeg = df.iloc[:, 1:17].values.T
+    eeg = df.iloc[:, 1:17].values.T
+    # should be # of columns vs # of data points
 
-eeg.shape
-# should be # of columns vs # of data points
+    eeg *= 0.02235
+    # scaling to µV, math on whiteboard idk if its right lol
 
-eeg *= 0.02235
-# scaling to µV, math on whiteboard idk if its right lol
-
-eeg -= np.mean(eeg, axis=1, keepdims=True)
+    eeg -= np.mean(eeg, axis=1, keepdims=True)
+    return eeg
 
 print(np.min(eeg), "to", np.max(eeg))
 
@@ -71,41 +70,103 @@ low = 1
 high = 60
 fs = 125 # standard for daisy board
 
-b, a = butter(4, [low/(fs/2), high/(fs/2)], btype='bandpass')
+def bandpass_filter(data, low, high, fs, order):
+    b, a = butter(order, [low/(fs/2), high/(fs/2)], btype="bandpass")
+    return filtfilt(b, a, data, axis = 1)
+def notch_filter(data, freq, fs, quality):
+    b, a = iirnotch(freq/(fs/2), quality)
+    return filtfilt(b, a, data, axis = 1)
 
-for i in range(16):
-    eeg[i] = filtfilt(b, a, eeg[i])
+def clean_eeg(eeg):
+    eeg = bandpass_filter(eeg, low, high, fs, 4)
+    eeg = notch_filter(eeg, 60, fs, 30)
 
-# added a notch filter not sure if its super necessary but better safe than sorry
-# https://www.mathworks.com/discovery/notch-filter.html
-# https://www.mathworks.com/help/dsp/ref/iirnotch.html
+    # added a notch filter not sure if its super necessary but better safe than sorry
+    # https://www.mathworks.com/discovery/notch-filter.html
+    # https://www.mathworks.com/help/dsp/ref/iirnotch.html
 
-b, a = iirnotch(60/(fs/2), 30)
-filtfilt(b, a, eeg, axis=1)
 
-t = np.arange(eeg.shape[1]) / fs
+    # https://www.geeksforgeeks.org/machine-learning/blind-source-separation-using-fastica-in-scikit-learn/
+    # i used this to write some of the code if you want to understand what this is doing
+    # i also used the sklearn documentation for FastICA: https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.FastICA.html
+    ica = FastICA(n_components=16, random_state=42, max_iter=1000)
+    # current matrix (16, # of samples) -> (# sample, 16) -> (16, # sample)
+    source_estimated = ica.fit_transform(eeg.T)  
+    sources_clean = source_estimated.copy()
+    # this is where you identify which sources are noise and set them to 0
+    noise = 
+    # find the noise sources
+    sources_clean[:, noise] = 0
+    # delete all noise sources that we set to 0
+    eeg_clean = ica.inverse_transform(sources_clean).T
+    # go back to our original matrix w clean spaces
+    eeg_clean -= np.mean(eeg_clean, axis=1, keepdims=True)
+    return eeg_clean
 
-print(eeg.shape)
-print(np.min(eeg), np.max(eeg))
-print(np.std(eeg))
-print(df.head())
+def epoch_data(eeg, epoch_length, fs):
+    samples_per_epoch = int(epoch_length * fs)
+    num_epochs = eeg.shape[1] // samples_per_epoch
+    eeg = eeg[:, :num_epochs * samples_per_epoch] 
+    eeg = eeg.reshape(eeg.shape[0], num_epochs, samples_per_epoch)
+    return eeg
 
-# sanity checks to make sure nothing is broken
 
-for i in range(16):
-    plt.plot(t, eeg[i] + i)
+# define frequency bands
+bands = {
+    'delta': (0.5, 4),
+    'theta': (4, 8),
+    'alpha': (8, 13),
+    'beta': (13, 30),
+    'gamma': (30, 60)
+}
 
-plt.xlabel("Time (s)")
-plt.ylabel("Amplitude (µV)")
-plt.ylim(-4, 17)
-plt.show()
+# unfinished
 
-# you can use this to zoom in on any channels you want from 0-16
-# ex. plt.plot(t, eeg[0]) zooms in on channel 1
-# you can also zoom in more on a single channel with like plt.plot(t, eeg[0, 0:10000]) or something probably
-plt.plot(t, eeg[0])
-plt.show()
+def bandpower(epoch, fs, band):
+    freqs, psd = psd_array_welch(epoch, fs=fs, n_fft=256)
+    # need to find the indexes of the freqs in the band
+    # then we average the psd values across those freqs to get the band power
 
-eeg -= np.mean(eeg, axis=0, keepdims=True)
+    return np.mean(band_psd, axis=-1)
 
-ica = FastICA(n_components=0.95, random_state=42, max_iter=1000)
+def av_extract(eeg, epoch_length, fs):
+    eeg_epoch = epoch_data(eeg, epoch_length, fs)
+    # format (channels, epochs, spe)
+    # should transpose to (e, c, spe) for FE
+    eeg_epoch = eeg_epoch.transpose(1, 0, 2)
+    feature_matrix = []
+    for epoch in eeg_epoch:
+        alpha_power = bandpower(epoch, fs, bands['alpha'])
+        beta = bandpower(epoch, fs, bands['beta'])
+        gamma = bandpower(epoch, fs, bands['gamma'])
+
+        # find some way to extract valence and arousal features from the data
+        # store them in feature matrix
+
+    return np.array(feature_matrix)
+
+
+
+# t = np.arange(eeg.shape[1]) / fs
+
+# print(eeg.shape)
+# print(np.min(eeg), np.max(eeg))
+# print(np.std(eeg))
+# print(df.head())
+
+# # sanity checks to make sure nothing is broken
+
+# for i in range(16):
+#     plt.plot(t, eeg[i] + i)
+
+# plt.xlabel("Time (s)")
+# plt.ylabel("Amplitude (µV)")
+# plt.ylim(-4, 17)
+# plt.show()
+
+# # you can use this to zoom in on any channels you want from 0-16
+# # ex. plt.plot(t, eeg[0]) zooms in on channel 1
+# # you can also zoom in more on a single channel with like plt.plot(t, eeg[0, 0:10000]) or something probably
+# plt.plot(t, eeg[0])
+# plt.show()
+
