@@ -1,0 +1,77 @@
+import numpy as np
+
+def fuzzy_entropy(dim, r, data, tau=1):
+    """
+    Fuzzy Entropy (FuzzyEn)
+
+    Parameters
+    ----------
+    dim : int
+        Embedding dimension (m)
+
+    r : float
+        Tolerance (typically 0.2 * std of signal)
+
+    data : 1D array-like
+        Time series data
+
+    tau : int, optional (default=1)
+        Downsampling delay (coarse graining factor)
+
+    Returns
+    -------
+    fuzzyen : float
+        Fuzzy entropy value
+    """
+
+    data = np.asarray(data, dtype=float)
+
+    # Downsample if tau > 1
+    if tau > 1:
+        data = data[::tau]
+
+    N = len(data)
+    Phi = np.zeros(2)
+
+    # compute φ_m and φ_{m+1}
+    for k, m in enumerate([dim, dim + 1]):
+
+        # number of embedded vectors
+        num_vec = N - m + 1
+
+        # Build embedded matrix (each column = one vector)
+        # Equivalent to Matlab:
+        # dataMat(j,:) = data(j:N-m+j)
+        dataMat = np.array([data[i:i + num_vec] for i in range(m)])
+
+        # baseline mean of each vector
+        U0 = np.mean(dataMat, axis=0)
+
+        # remove baseline (vector shape similarity)
+        Sm = np.abs(dataMat - U0)
+
+        Ci = np.zeros(num_vec)
+
+        # compare each vector with all others (exclude self match)
+        for i in range(num_vec):
+
+            # remove self-match
+            Sm_i = Sm[:, i][:, None]             # shape (m,1)
+            Sm_tmp = np.delete(Sm, i, axis=1)    # remove column i
+
+            # Chebyshev distance (maximum absolute difference)
+            dij = np.max(np.abs(Sm_i - Sm_tmp), axis=0)
+
+            # fuzzy similarity function
+            Aij = np.exp(-np.log(2) * (dij / r) ** 2)
+
+            # average similarity
+            Ci[i] = np.mean(Aij)
+
+        # average over all vectors
+        Phi[k] = np.mean(Ci)
+
+    # fuzzy entropy definition
+    fuzzyen = np.log(Phi[0]) - np.log(Phi[1])
+
+    return fuzzyen
