@@ -33,6 +33,7 @@ from scipy.signal import iirnotch
 from sklearn.decomposition import FastICA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
+filepath = "./OpenBCI_Data/1-31/OpenBCISession_sad_stimuli_1_31"
 
 
 def load_data(filepath):
