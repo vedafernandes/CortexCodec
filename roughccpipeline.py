@@ -35,9 +35,9 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 
 
-def load_data(path):
+def load_data(filepath):
     df = pd.read_csv(
-        path,
+        filepath,
         comment='%',
         sep=None,
         engine='python'
