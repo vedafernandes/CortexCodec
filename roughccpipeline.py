@@ -33,16 +33,15 @@ from scipy.signal import iirnotch
 from sklearn.decomposition import FastICA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
-filepath = "/Users/tanishamandal/CortexCodec/OpenBCI_Data/2-7/OpenBCISession_fail_happy_stimuli_2_7/BrainFlow-RAW_happy_stimuli_2_7_0.csv"
 
 
-def load_data(filepath):
+def load_data(path):
     df = pd.read_csv(
-    filepath,
-    comment='%',
-    sep=None,
-    engine='python'
-)
+        path,
+        comment='%',
+        sep=None,
+        engine='python'
+    )
     print(df.head())
 
     eeg = df.iloc[:, 1:17].values.T
@@ -54,10 +53,7 @@ def load_data(filepath):
     eeg -= np.mean(eeg, axis=1, keepdims=True)
     return eeg
 
-print(np.min(eeg), "to", np.max(eeg))
 
-for i in range(16):
-    print(np.std(eeg[i]))
 
 """I used a butterworth bandpass filter bc it was familiar but I think it could be worthwhile to use the built in BrainFlow filter instead? If someone could test that out that would be cool: https://brainflow.readthedocs.io/en/stable/UserAPI.html
 
@@ -67,9 +63,9 @@ I think the DataFilter command works here but I'm lowk not sure how to use it :(
 # butterworth bandpass (see if you can figure out how this works on your own!)
 # ref: https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.butter.html
 # https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.filtfilt.html
-low = 1
-high = 60
-fs = 125 # standard for daisy board
+LOW = 1
+HIGH = 60
+FS = 125 # standard for daisy board
 
 def bandpass_filter(data, low, high, fs, order):
     b, a = butter(order, [low/(fs/2), high/(fs/2)], btype="bandpass")
@@ -79,8 +75,8 @@ def notch_filter(data, freq, fs, quality):
     return filtfilt(b, a, data, axis = 1)
 
 def clean_eeg(eeg):
-    eeg = bandpass_filter(eeg, low, high, fs, 4)
-    eeg = notch_filter(eeg, 60, fs, 30)
+    eeg = bandpass_filter(eeg, LOW, HIGH, FS, 4)
+    eeg = notch_filter(eeg, 60, FS, 30)
 
     # added a notch filter not sure if its super necessary but better safe than sorry
     # https://www.mathworks.com/discovery/notch-filter.html
@@ -95,7 +91,7 @@ def clean_eeg(eeg):
     source_estimated = ica.fit_transform(eeg.T)  
     sources_clean = source_estimated.copy()
     # this is where you identify which sources are noise and set them to 0
-    noise = 
+    noise = []
     # find the noise sources
     sources_clean[:, noise] = 0
     # delete all noise sources that we set to 0
@@ -113,7 +109,7 @@ def epoch_data(eeg, epoch_length, fs):
 
 
 # define frequency bands
-bands = {
+BANDS = {
     'delta': (0.5, 4),
     'theta': (4, 8),
     'alpha': (8, 13),
@@ -121,53 +117,65 @@ bands = {
     'gamma': (30, 60)
 }
 
-# unfinished
+def bandpower(epoch, fs, band, n_fft=256):
+    n_times = epoch.shape[-1]
+    n_fft = min(n_fft, n_times)
+    psd, freqs = psd_array_welch(epoch, sfreq=fs, n_fft=n_fft)
 
-def bandpower(epoch, fs, band):
-    freqs, psd = psd_array_welch(epoch, fs=fs, n_fft=256)
     # need to find the indexes of the freqs in the band
     # then we average the psd values across those freqs to get the band power
+    low, high = band
+    idx_band = (freqs >= low) & (freqs <= high)
+    band_psd = psd[..., idx_band]
 
     return np.mean(band_psd, axis=-1)
 
-def av_extract(eeg, epoch_length, fs):
+
+def av_extract(eeg, epoch_length, fs): 
     eeg_epoch = epoch_data(eeg, epoch_length, fs)
     # format (channels, epochs, spe)
     # should transpose to (e, c, spe) for FE
     eeg_epoch = eeg_epoch.transpose(1, 0, 2)
     feature_matrix = []
     for epoch in eeg_epoch:
-        alpha_power = bandpower(epoch, fs, bands['alpha'])
-        beta = bandpower(epoch, fs, bands['beta'])
-        gamma = bandpower(epoch, fs, bands['gamma'])
+        alpha_power = bandpower(epoch, fs, BANDS['alpha'])
+        beta_power = bandpower(epoch, fs, BANDS['beta'])
+        gamma_power = bandpower(epoch, fs, BANDS['gamma'])
 
-        # find some way to extract valence and arousal features from the data
-        # store them in feature matrix
+        # simple feature vector: concatenate band powers across channels
+        features = np.concatenate([alpha_power, beta_power, gamma_power])
+        feature_matrix.append(features)
 
     return np.array(feature_matrix)
 
 
 
-# t = np.arange(eeg.shape[1]) / fs
 
-# print(eeg.shape)
-# print(np.min(eeg), np.max(eeg))
-# print(np.std(eeg))
-# print(df.head())
+if __name__ == "__main__":
 
-# # sanity checks to make sure nothing is broken
+    filepath = "OpenBCI_Data/2-7/OpenBCISession_fail_happy_stimuli_2_7/BrainFlow-RAW_happy_stimuli_2_7_0.csv"
 
-# for i in range(16):
-#     plt.plot(t, eeg[i] + i)
+    eeg = load_data(filepath)
 
-# plt.xlabel("Time (s)")
-# plt.ylabel("Amplitude (µV)")
-# plt.ylim(-4, 17)
-# plt.show()
+    t = np.arange(eeg.shape[1]) / FS
 
-# # you can use this to zoom in on any channels you want from 0-16
-# # ex. plt.plot(t, eeg[0]) zooms in on channel 1
-# # you can also zoom in more on a single channel with like plt.plot(t, eeg[0, 0:10000]) or something probably
-# plt.plot(t, eeg[0])
-# plt.show()
+    print(f"EEG shape: {eeg.shape}")
+    print(f"EEG min freq, max freq: {np.min(eeg)}, {np.max(eeg)}")
+    print(f"EEG standard deviation: {np.std(eeg)}")
+
+    # sanity checks to make sure nothing is broken
+
+    for i in range(16):
+        plt.plot(t, eeg[i] + i)
+
+    plt.xlabel("Time (s)")
+    plt.ylabel("Amplitude (µV)")
+    plt.ylim(-4, 17)
+    plt.show()
+
+    # you can use this to zoom in on any channels you want from 0-16
+    # ex. plt.plot(t, eeg[0]) zooms in on channel 1
+    # you can also zoom in more on a single channel with like plt.plot(t, eeg[0, 0:10000]) or something probably
+    plt.plot(t, eeg[0])
+    plt.show()
 
