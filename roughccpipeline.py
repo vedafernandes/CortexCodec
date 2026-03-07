@@ -33,7 +33,7 @@ from scipy.signal import iirnotch
 from sklearn.decomposition import FastICA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
-filepath = "/Users/tanishamandal/CortexCodec/OpenBCI_Data/2-7/OpenBCISession_fail_happy_stimuli_2_7/BrainFlow-RAW_happy_stimuli_2_7_0.csv"
+filepath = "./OpenBCI_Data/2-7/OpenBCISession_fail_happy_stimuli_2_7/BrainFlow-RAW_happy_stimuli_2_7_0.csv"
 
 
 def load_data(filepath):
@@ -54,11 +54,14 @@ def load_data(filepath):
     eeg -= np.mean(eeg, axis=1, keepdims=True)
     return eeg
 
+eeg = load_data(filepath)
+
 print(np.min(eeg), "to", np.max(eeg))
 
 for i in range(16):
     print(np.std(eeg[i]))
 
+print("----DELIMITER - data loaded----")
 """I used a butterworth bandpass filter bc it was familiar but I think it could be worthwhile to use the built in BrainFlow filter instead? If someone could test that out that would be cool: https://brainflow.readthedocs.io/en/stable/UserAPI.html
 
 I think the DataFilter command works here but I'm lowk not sure how to use it :(
@@ -78,6 +81,10 @@ def notch_filter(data, freq, fs, quality):
     b, a = iirnotch(freq/(fs/2), quality)
     return filtfilt(b, a, data, axis = 1)
 
+bandpass_filtered = bandpass_filter(eeg, low, high, fs, 1)
+
+print("----DELIMITER - bandpsas filter successful----")
+
 def clean_eeg(eeg):
     eeg = bandpass_filter(eeg, low, high, fs, 4)
     eeg = notch_filter(eeg, 60, fs, 30)
@@ -95,7 +102,7 @@ def clean_eeg(eeg):
     source_estimated = ica.fit_transform(eeg.T)  
     sources_clean = source_estimated.copy()
     # this is where you identify which sources are noise and set them to 0
-    noise = 
+    noise = 0 #change this
     # find the noise sources
     sources_clean[:, noise] = 0
     # delete all noise sources that we set to 0
@@ -103,6 +110,9 @@ def clean_eeg(eeg):
     # go back to our original matrix w clean spaces
     eeg_clean -= np.mean(eeg_clean, axis=1, keepdims=True)
     return eeg_clean
+
+eeg_cleaned = clean_eeg(eeg)
+print("----DELIMITER - eeg clean successful----")
 
 def epoch_data(eeg, epoch_length, fs):
     samples_per_epoch = int(epoch_length * fs)
@@ -127,7 +137,9 @@ def bandpower(epoch, fs, band):
     freqs, psd = psd_array_welch(epoch, fs=fs, n_fft=256)
     # need to find the indexes of the freqs in the band
     # then we average the psd values across those freqs to get the band power
-
+    low, high = band
+    band_mask = (freqs >= low) & (freqs <= high)
+    band_psd = psd[:, band_mask]
     return np.mean(band_psd, axis=-1)
 
 def av_extract(eeg, epoch_length, fs):
