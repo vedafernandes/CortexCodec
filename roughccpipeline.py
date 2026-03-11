@@ -178,7 +178,7 @@ def data(file_list):
 
     return X, y
     
-def train_test_SVM(X,y):
+def train_SVM(X,y):
     print("Features shape:" ,X.shape)
     print("labels shape: " , y.shape)
     sad_count, happy_count = np.bincount(y)
@@ -189,10 +189,8 @@ def train_test_SVM(X,y):
     X_train, X_test, y_train, y_test = train_test_split(X,y,test_size = 0.2,shuffle=True,random_state=42)
    
     model = svm.SVC().fit(X_train,y_train)
+    return model 
 
-    scores = cross_val_score(model, X,y, cv=5, scoring = 'f1')
-
-    return scores
 
 
 if __name__ == "__main__":
@@ -203,7 +201,8 @@ if __name__ == "__main__":
     file_list = [filepath_happy, filepath_sad]
 
     X,y = data(file_list)
-    scores = train_test_SVM(X,y)
+    model = train_SVM(X,y)
+    scores = cross_val_score(model, X,y, cv=5, scoring = 'f1')
     
     print(scores.mean())
     #eeg = load_data(filepath_happy)
