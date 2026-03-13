@@ -17,12 +17,16 @@ from mne.time_frequency import psd_array_welch
 
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn import svm
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import cross_val_score
+
 from sklearn.model_selection import (
     train_test_split,
     StratifiedKFold,
-    GridSearchCV
+    GridSearchCV 
 )
 from sklearn.metrics import (
     classification_report,
@@ -32,8 +36,6 @@ from scipy.signal import butter, filtfilt, detrend
 from scipy.signal import iirnotch
 from sklearn.decomposition import FastICA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-
-
 
 def load_data(filepath):
     df = pd.read_csv(
@@ -148,34 +150,79 @@ def av_extract(eeg, epoch_length, fs):
 
     return np.array(feature_matrix)
 
+def feature_extraction(filepath):
+    eeg_raw = load_data(filepath)
+    eeg = clean_eeg(eeg_raw)
+    features_matrix = av_extract(eeg, 2, FS)
+    return features_matrix
 
+#0 is sad, 1 is happy
+def data(file_list):
+    X = [] #feature matrix
+    y = [] #training labels
+
+    for filepath in file_list:
+        features_matrix = feature_extraction(filepath)
+
+        if "happy" in filepath:
+            label = 1
+        else:
+            label = 0
+
+        for epoch_features in features_matrix:
+            X.append(epoch_features)
+            y.append(label)
+
+    X = np.array(X)
+    y = np.array(y)
+
+    return X, y
+    
+def train_test_SVM(X,y):
+    print("Features shape:", X.shape)
+    print("labels shape:", y.shape)
+
+    sad_count, happy_count = np.bincount(y)
+    print("Sad:", sad_count)
+    print("Happy:", happy_count)
+
+    model = svm.SVC()
+    scores = cross_val_score(model, X,y, cv=5, scoring = 'f1') #trains and tests SVM with k-fold cross validation method
+
+    return scores
 
 
 if __name__ == "__main__":
 
-    filepath = "OpenBCI_Data/2-7/OpenBCISession_fail_happy_stimuli_2_7/BrainFlow-RAW_happy_stimuli_2_7_0.csv"
+    filepath_happy = "OpenBCI_Data/2-7/OpenBCISession_happy_stimuli2_2_7/BrainFlow-RAW_happy_stimuli2_2_7_0.csv"
+    filepath_sad = "OpenBCI_Data/2-7/OpenBCISession_sad_stimuli_2_7/BrainFlow-RAW_sad_stimuli_2_7_0.csv"
 
-    eeg = load_data(filepath)
+    file_list = [filepath_happy, filepath_sad]
 
-    t = np.arange(eeg.shape[1]) / FS
+    X,y = data(file_list)
+    scores = train_test_SVM(X,y)
+    print(scores.mean())
+    #eeg = load_data(filepath_happy)
 
-    print(f"EEG shape: {eeg.shape}")
-    print(f"EEG min freq, max freq: {np.min(eeg)}, {np.max(eeg)}")
-    print(f"EEG standard deviation: {np.std(eeg)}")
+    #t = np.arange(eeg.shape[1]) / FS
+
+    #print(f"EEG shape: {eeg.shape}")
+    #print(f"EEG min freq, max freq: {np.min(eeg)}, {np.max(eeg)}")
+    #print(f"EEG standard deviation: {np.std(eeg)}")
 
     # sanity checks to make sure nothing is broken
 
-    for i in range(16):
-        plt.plot(t, eeg[i] + i)
+    #for i in range(16):
+        #plt.plot(t, eeg[i] + i)
 
-    plt.xlabel("Time (s)")
-    plt.ylabel("Amplitude (µV)")
-    plt.ylim(-4, 17)
-    plt.show()
+    #plt.xlabel("Time (s)")
+    #plt.ylabel("Amplitude (µV)")
+    #plt.ylim(-4, 17)
+    #plt.show()
 
     # you can use this to zoom in on any channels you want from 0-16
     # ex. plt.plot(t, eeg[0]) zooms in on channel 1
     # you can also zoom in more on a single channel with like plt.plot(t, eeg[0, 0:10000]) or something probably
-    plt.plot(t, eeg[0])
-    plt.show()
+    #plt.plot(t, eeg[3])
+    #plt.show()
 
